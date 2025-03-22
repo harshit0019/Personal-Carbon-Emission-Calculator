@@ -17,6 +17,3 @@ A **streamlined and interactive web app** that calculates an individual's **carb
 - **Pandas** 📊 (Data Processing)
 - **Session State** (User Data Management)
 
-## **📦 Installation**
-```bash
-
