@@ -1,5 +1,6 @@
 # Personal-Carbon-Emission-Calculator
-# 🌍 Personal Carbon Footprint Calculator - https://personal-carbon-emission-calculator-ebhln3jnpdqpsspxpdfzs3.streamlit.app/
+# 🌍 Personal Carbon Footprint Calculator 
+- https://personal-carbon-emission-calculatorr.streamlit.app/
 
 A **streamlined and interactive web app** that calculates an individual's **carbon footprint** based on lifestyle factors like **transportation, electricity usage, diet, and waste management**.  
 
