@@ -1,139 +1,163 @@
 import streamlit as st
 import pandas as pd
 
-# Emission factors for different countries
+# ─── Emission factors per base unit ───────────────────────────────────────────
 EMISSION_FACTOR = {
-    "India": {"Transportation": 0.14, "Electricity": 0.8, "Diet": 1.25, "Waste": 0.1},
-    "USA": {"Transportation": 0.24, "Electricity": 0.45, "Diet": 2.0, "Waste": 0.12},
-    "UK": {"Transportation": 0.21, "Electricity": 0.3, "Diet": 1.8, "Waste": 0.09},
+    "India": {"Transportation": 0.14, "Electricity": 0.8,  "Diet": 1.25, "Waste": 0.1},
+    "USA":   {"Transportation": 0.24, "Electricity": 0.45, "Diet": 2.0,  "Waste": 0.12},
+    "UK":    {"Transportation": 0.21, "Electricity": 0.3,  "Diet": 1.8,  "Waste": 0.09},
+}
+
+# ─── Unit config: (label, conversion-to-base) ─────────────────────────────────
+UNIT_CONFIG = {
+    "India": {"distance": ("km",    1.0),
+              "electricity": ("kWh", 1.0),
+              "waste":       ("kg",  1.0),
+              "diet":        ("meals",1.0)},
+    "USA":   {"distance": ("miles",   1.60934),
+              "electricity": ("kWh",   1.0),
+              "waste":       ("lbs",    0.453592),
+              "diet":        ("meals", 1.0)},
+    "UK":    {"distance": ("miles",   1.60934),
+              "electricity": ("kWh",   1.0),
+              "waste":       ("kg",     1.0),
+              "diet":        ("meals", 1.0)},
 }
 
 st.set_page_config(layout="wide", page_title="Personal Carbon Calculator")
 st.title("🌍 Personal Carbon Calculator App")
 
-# Initialize session state for history and input values
+# ─── Session state initialization ──────────────────────────────────────────────
 if "history" not in st.session_state:
     st.session_state.history = []
 
 if "inputs" not in st.session_state:
     st.session_state.inputs = {
-        "country": "India",
-        "distance": 50.0,
-        "electricity": 500.0,
-        "waste": 10.0,
-        "diet": 2
+        "country":    "India",
+        "distance":   50.0,
+        "electricity":500.0,
+        "waste":      10.0,
+        "diet":       2
     }
 
-# Reset function
 def reset_inputs():
     st.session_state.inputs = {
-        "country": "India",
-        "distance": 50.0,
-        "electricity": 500.0,
-        "waste": 10.0,
-        "diet": 2
+        "country":    "India",
+        "distance":   50.0,
+        "electricity":500.0,
+        "waste":      10.0,
+        "diet":       2
     }
 
-# Select country
+# ─── Country selector ──────────────────────────────────────────────────────────
 st.subheader("🌍 Your Country")
-st.session_state.inputs["country"] = st.selectbox("Select", list(EMISSION_FACTOR.keys()), index=list(EMISSION_FACTOR.keys()).index(st.session_state.inputs["country"]))
+country = st.selectbox(
+    "Select your country:",
+    options=list(EMISSION_FACTOR.keys()),
+    index=list(EMISSION_FACTOR.keys()).index(st.session_state.inputs["country"])
+)
+st.session_state.inputs["country"] = country
+units = UNIT_CONFIG[country]
 
+# ─── User inputs ───────────────────────────────────────────────────────────────
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("🚗 Daily Commute Distance (km)")
-    st.session_state.inputs["distance"] = st.slider("Distance", 0.0, 100.0, st.session_state.inputs["distance"])
+    st.subheader(f"🚗 Daily Commute Distance ({units['distance'][0]})")
+    st.session_state.inputs["distance"] = st.slider(
+        f"Distance ({units['distance'][0]})", 0.0, 200.0, st.session_state.inputs["distance"]
+    )
 
-    st.subheader("💡 Monthly Electricity Consumption (kWh)")
-    st.session_state.inputs["electricity"] = st.slider("Electricity", 0.0, 1000.0, st.session_state.inputs["electricity"])
+    st.subheader(f"💡 Monthly Electricity Consumption ({units['electricity'][0]})")
+    st.session_state.inputs["electricity"] = st.slider(
+        f"Electricity ({units['electricity'][0]})", 0.0, 2000.0, st.session_state.inputs["electricity"]
+    )
 
 with col2:
-    st.subheader("🗑️ Weekly Waste Generated (kg)")
-    st.session_state.inputs["waste"] = st.slider("Waste", 0.0, 100.0, st.session_state.inputs["waste"])
+    st.subheader(f"🗑️ Weekly Waste Generated ({units['waste'][0]})")
+    st.session_state.inputs["waste"] = st.slider(
+        f"Waste ({units['waste'][0]})", 0.0, 200.0, st.session_state.inputs["waste"]
+    )
 
     st.subheader("🍎 Meals per Day")
-    st.session_state.inputs["diet"] = st.number_input("Diet", 0, 3, st.session_state.inputs["diet"])
+    st.session_state.inputs["diet"] = st.number_input(
+        "Diet (meals/day)", 0, 10, st.session_state.inputs["diet"]
+    )
 
-# Convert to yearly values
-distance = st.session_state.inputs["distance"] * 365
-electricity = st.session_state.inputs["electricity"] * 12
-waste = st.session_state.inputs["waste"] * 365
-diet = st.session_state.inputs["diet"] * 52
-country = st.session_state.inputs["country"]
+# ─── Convert to base units & annualize ────────────────────────────────────────
+distance_km     = st.session_state.inputs["distance"] * units["distance"][1] * 365
+electricity_kwh = st.session_state.inputs["electricity"] * 12 * units["electricity"][1]
+waste_kg        = st.session_state.inputs["waste"] * units["waste"][1] * 365
+diet_meals      = st.session_state.inputs["diet"] * 52 * units["diet"][1]
 
-# Compute emissions
-transportation_emission = round(EMISSION_FACTOR[country]["Transportation"] * distance / 1000, 2)
-electricity_emission = round(EMISSION_FACTOR[country]["Electricity"] * electricity / 1000, 2)
-diet_emission = round(EMISSION_FACTOR[country]["Diet"] * diet / 1000, 2)
-waste_emission = round(EMISSION_FACTOR[country]["Waste"] * waste / 1000, 2)
+# ─── Emissions calculations (tonnes CO₂/yr) ──────────────────────────────────
+transport_em   = round(EMISSION_FACTOR[country]["Transportation"] * (distance_km / 1000), 2)
+electricity_em = round(EMISSION_FACTOR[country]["Electricity"]    * (electricity_kwh / 1000), 2)
+diet_em        = round(EMISSION_FACTOR[country]["Diet"]           * (diet_meals / 1000), 2)
+waste_em       = round(EMISSION_FACTOR[country]["Waste"]          * (waste_kg / 1000), 2)
+total_em       = round(transport_em + electricity_em + diet_em + waste_em, 2)
 
-total_emissions = round(transportation_emission + electricity_emission + diet_emission + waste_emission, 2)
-
-if st.button("Calculate CO2 Emissions"):
-    # Append new data to history list
+# ─── Calculate button & results ──────────────────────────────────────────────
+calculate = st.button("Calculate CO2 Emissions")
+if calculate:
+    # save to history with static column names
     st.session_state.history.append({
-        "Country": country,
-        "Transport": transportation_emission,
-        "Electricity": electricity_emission,
-        "Diet": diet_emission,
-        "Waste": waste_emission,
-        "Total CO2": total_emissions
+        "Country":        country,
+        "Distance":       f"{st.session_state.inputs['distance']} {units['distance'][0]}/day",
+        "Electricity":    f"{st.session_state.inputs['electricity']} {units['electricity'][0]}/month",
+        "Waste":          f"{st.session_state.inputs['waste']} {units['waste'][0]}/week",
+        "Meals/day":      st.session_state.inputs["diet"],
+        "Total CO2 (t/yr)": total_em
     })
 
-    st.header("📊 Results")
-    col3, col4 = st.columns(2)
+    # Breakdown & total
+    st.header("📊 Your Annual Carbon Footprint")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Breakdown")
+        st.write(f"🚗 Transport:   **{transport_em}** t CO₂/yr")
+        st.write(f"💡 Electricity: **{electricity_em}** t CO₂/yr")
+        st.write(f"🍎 Diet:        **{diet_em}** t CO₂/yr")
+        st.write(f"🗑️ Waste:       **{waste_em}** t CO₂/yr")
 
-    with col3:
-        st.subheader("📌 Category Breakdown (per year)")
-        st.info(f"🚗 **Transport:** {transportation_emission} tonnes CO₂/year")
-        st.info(f"💡 **Electricity:** {electricity_emission} tonnes CO₂/year")
-        st.info(f"🍎 **Diet:** {diet_emission} tonnes CO₂/year")
-        st.info(f"🗑️ **Waste:** {waste_emission} tonnes CO₂/year")
-
-    with col4:
-        st.subheader("🌍 Total Carbon Footprint (per year)")
-        st.success(f"🔥 **Total: {total_emissions} tonnes CO₂/year**")
-
-        # Gamification Badges
-        if total_emissions < 1:
-            st.success("🏆 **Gold Badge: Excellent! You're eco-friendly!**")
-        elif total_emissions < 1.5:
-            st.success("🥈 **Silver Badge: Good! Keep reducing!**")
+    with c2:
+        st.subheader("Total")
+        st.success(f"🔥 **{total_em} tonnes CO₂ per year**")
+        if total_em < 1:
+            st.balloons(); st.success("🏆 Gold Badge: Excellent!")
+        elif total_em < 1.5:
+            st.info("🥈 Silver Badge: Good, keep it up!")
         else:
-            st.success("🥉 **Bronze Badge: Reduce emissions for a better future!**")
+            st.warning("🥉 Bronze Badge: There’s room to improve.")
 
-    # CO₂ Equivalents & Carbon Offsetting Suggestions
+    # CO₂ Equivalents & Offsetting
     st.divider()
     col5, col6 = st.columns(2)
-    
     with col5:
         st.subheader("🌎 CO₂ Equivalents (per year)")
-        flight_equivalent = round(total_emissions / 0.18, 1)  # Avg. CO₂ per passenger flight per km
-        car_equivalent = round(total_emissions / 0.4, 1)  # Avg. CO₂ per km for a car
-        tree_offset = round(total_emissions * 50)  # Approx. 50 trees absorb 1 tonne CO₂ in a year
-
-        st.info(f"✈️ **Your emissions equal traveling** {flight_equivalent} **times in a plane for 1000 km**")
-        st.info(f"🚗 **Or driving a car for** {car_equivalent} **thousand km**")
-        st.info(f"🌳 **You'd need to plant** {tree_offset} **trees per year to offset this!**")
+        flight_eq = round(total_em / 0.18, 1)
+        car_eq    = round(total_em / 0.4, 1)
+        trees     = round(total_em * 50)
+        st.info(f"✈️ Equivalent to **{flight_eq}** flights of 1,000 km")
+        st.info(f"🚗 Or driving **{car_eq}** × 1,000 km")
+        st.info(f"🌳 Plant **{trees}** trees to offset")
 
     with col6:
-        st.subheader("🌿 Carbon Offsetting Suggestions (per year)")
-        st.info("- 🚆 Switch to **public transport** or **electric vehicles**")
-        st.info("- 💡 Reduce **electricity usage** by switching to **LED lights**")
-        st.info("- 🍏 Follow a **low-carbon diet** by reducing **meat** consumption")
-        st.info("- 🗑️ **Recycle waste** and **compost organic waste**")
-        st.info("- 🌞 **Use renewable energy** sources like **solar panels**")
+        st.subheader("🌿 Carbon Offsetting Suggestions")
+        st.info("- 🚆 Switch to public transport or EVs")
+        st.info("- 💡 Use LED lighting")
+        st.info("- 🍏 Reduce meat consumption")
+        st.info("- ♻️ Recycle & compost")
+        st.info("- ☀️ Install solar panels")
 
     st.success("✅ Data Successfully Calculated!")
 
-# Enter New Data Button
-if st.button("Enter New Data"):
-    reset_inputs()
-    st.rerun()
+# ─── Reset button with callback ────────────────────────────────────────────────
+st.button("Enter New Data", on_click=reset_inputs)
 
-# Show History
+# ─── Emission history table ──────────────────────────────────────────────────
 st.subheader("📜 Emission History")
-if len(st.session_state.history) > 0:
-    df = pd.DataFrame(st.session_state.history)  # Convert list to DataFrame
+if st.session_state.history:
+    df = pd.DataFrame(st.session_state.history)
     st.dataframe(df)
 else:
     st.info("No previous calculations found.")
